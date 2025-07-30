@@ -12,7 +12,7 @@ __pycache__/
 
 # Ignore installers and large binaries
 installers/*
-!installers/sysmonconfig.xml   # Keep the config file
+
 
 # Ignore Ansible secrets or temporary files
 *.retry
