@@ -1,0 +1,20 @@
+---
+- name: Ensure system is updated and essential packages are installed
+  dnf:
+    name:
+      - wget
+      - tar
+      - unzip # Needed for unzipping the TA (now in installers/)
+    state: present
+    update_cache: yes # Ensure cache is updated
+
+- name: Configure firewalld for Splunk ports (8000, 8089, 9997)
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: yes
+    state: enabled
+  loop:
+    - 8000
+    - 8089
+    - "{{ splunk_receiving_port }}"
+  notify: Reload firewalld 

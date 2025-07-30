@@ -1,0 +1,6 @@
+---
+- name: 1. Setup Base OS and Firewalld
+  hosts: splunk_servers
+  become: true
+  roles:
+    - splunk_server_linux

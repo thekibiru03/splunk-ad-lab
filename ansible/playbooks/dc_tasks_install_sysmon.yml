@@ -1,0 +1,45 @@
+---
+- name: 3. Install and Configure Sysmon
+  hosts: windows_servers
+  gather_facts: false
+
+  vars:
+    sysmon_install_dir: C:\Sysmon
+
+  tasks:
+    - name: Create Sysmon installation directory
+      ansible.windows.win_file:
+        path: "{{ sysmon_install_dir }}"
+        state: directory
+
+    - name: Copy Sysmon zip from synced installers folder
+      ansible.windows.win_copy:
+        src: C:\vagrant_installers\{{ sysmon_zip_filename }}
+        dest: "{{ sysmon_install_dir }}\\{{ sysmon_zip_filename }}"
+        remote_src: yes
+      
+    - name: Copy Sysmon config from synced installers folder
+      ansible.windows.win_copy:
+        src: C:\vagrant_installers\{{ sysmon_config_xml_filename }}
+        dest: "{{ sysmon_install_dir }}\\{{ sysmon_config_xml_filename }}"
+        remote_src: yes
+
+    - name: Unarchive Sysmon
+      community.windows.win_unzip:
+        src: "{{ sysmon_install_dir }}\\{{ sysmon_zip_filename }}"
+        dest: "{{ sysmon_install_dir }}"
+        rm: yes
+
+    - name: Check if Sysmon service is already installed
+      ansible.windows.win_shell: Get-Service -Name Sysmon64 -ErrorAction SilentlyContinue
+      register: sysmon_service_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install Sysmon with the specified configuration
+      ansible.windows.win_shell: |
+        .\Sysmon64.exe -accepteula -i {{ sysmon_config_xml_filename }}
+      args:
+        chdir: "{{ sysmon_install_dir }}"
+      when: sysmon_service_check.stdout == "" # Only run if the service does not exist
+      register: sysmon_install_result

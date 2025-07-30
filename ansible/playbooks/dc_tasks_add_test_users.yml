@@ -1,0 +1,49 @@
+---
+- name: 2. Add Auto-Generated Test Users to Active Directory
+  hosts: windows_servers
+  gather_facts: false
+
+  tasks:
+    - name: Pre-flight Check - Verify Internet Connectivity
+      ansible.windows.win_shell: |
+        if (-not (Test-Connection -ComputerName 8.8.8.8 -Count 1 -Quiet)) {
+          Write-Error "Cannot connect to the internet (ping 8.8.8.8 failed)."
+          exit 1
+        }
+        if (-not (Resolve-DnsName -Name "randomuser.me" -ErrorAction SilentlyContinue)) {
+          Write-Error "Cannot resolve DNS for randomuser.me."
+          exit 1
+        }
+        Write-Host "Internet connectivity is OK."
+
+    - name: Pre-flight Check - Verify Active Directory Service is responsive
+      ansible.windows.win_powershell:
+        script: |
+          try {
+            Get-ADDomain -Server localhost -ErrorAction Stop
+            Write-Host "Active Directory service is responsive."
+            exit 0
+          }
+          catch {
+            Write-Error "Active Directory service is not responsive."
+            exit 1
+          }
+      register: ad_check
+      until: ad_check.failed == false
+      retries: 5
+      delay: 10
+
+    - name: Create a temporary directory on the server
+      ansible.windows.win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Copy the Add-TestUsers script to the server
+      ansible.windows.win_copy:
+        src: ../scripts/Add-TestUsers.ps1
+        dest: C:\Temp\Add-TestUsers.ps1
+
+    - name: Execute the script to create 15 test users
+      ansible.windows.win_shell: C:\Temp\Add-TestUsers.ps1 -NumUsers 15 -Nationalities "gb" -CompanyName "Blanc Inc"
+      args:
+        chdir: C:\Temp

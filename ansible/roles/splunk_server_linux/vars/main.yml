@@ -1,0 +1,4 @@
+---
+splunk_home: "/opt/splunk"
+splunk_user: "splunk"
+splunk_group: "splunk"

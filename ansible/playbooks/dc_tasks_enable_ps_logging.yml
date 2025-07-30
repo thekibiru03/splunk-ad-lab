@@ -1,0 +1,29 @@
+---
+- name: 4. Enable Advanced PowerShell Logging
+  hosts: windows_servers
+  gather_facts: false
+
+  tasks:
+    - name: Enable PowerShell Script Block Logging
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging
+        name: EnableScriptBlockLogging
+        data: 1
+        type: dword
+        state: present
+
+    - name: Enable PowerShell Module Logging
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging
+        name: EnableModuleLogging
+        data: 1
+        type: dword
+        state: present
+
+    - name: Configure Module Logging for all modules
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging\ModuleNames
+        name: '*'
+        data: '*'
+        type: string
+        state: present

@@ -1,0 +1,51 @@
+---
+- name: 7. Install Atomic Red Team Framework
+  hosts: windows_servers
+  gather_facts: false
+
+  tasks:
+    - name: Check PowerShell version
+      win_shell: $PSVersionTable.PSVersion.Major
+      register: ps_version_check
+      changed_when: false
+      check_mode: no
+
+    - name: Fail if PowerShell version is less than 5
+      fail:
+        msg: "Atomic Red Team requires PowerShell version 5 or higher. Found version {{ ps_version_check.stdout_lines[0] }}."
+      when: ps_version_check.stdout | int < 5
+
+    - name: Enable strong .NET cryptography for reliable TLS connections
+      win_regedit:
+        path: "{{ item }}"
+        name: SchUseStrongCrypto
+        type: dword
+        data: 1
+        state: present
+      with_items:
+        - "HKLM:\\SOFTWARE\\Microsoft\\.NetFramework\\v4.0.30319"
+        - "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\.NetFramework\\v4.0.30319"
+
+    - name: Install powershell-yaml module dependency
+      win_shell: Install-Module -Name powershell-yaml -Repository PSGallery -Force -Scope AllUsers
+      args:
+        # Check for the module's directory to make this task idempotent
+        creates: C:\Program Files\WindowsPowerShell\Modules\powershell-yaml
+
+
+    - name: Install Atomic Red Team Framework and Atomics
+      win_shell: |
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Internet Explorer\Main" -Name "DisableFirstRunCustomize" -Value 2
+        IEX (IWR 'https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/install-atomicredteam.ps1' -UseBasicParsing)
+        Install-AtomicRedTeam -Force
+        IEX (IWR 'https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/install-atomicsfolder.ps1' -UseBasicParsing)
+        Install-AtomicsFolder -Force
+      args:
+        # Check for the module manifest to make this task idempotent
+        creates: C:\AtomicRedTeam\invoke-atomicredteam\invoke-atomicredteam.psd1
+
+
+    - name: Set PowerShell profile to auto-load Atomic Red Team module
+      win_copy:
+        src: ../scripts/profile.ps1 # This path now points to the scripts folder
+        dest: C:\Windows\System32\WindowsPowerShell\v1.0\profile.ps1

@@ -1,0 +1,45 @@
+# Ignore Vagrant artifacts
+.vagrant/
+*.box
+
+# Ignore OS/system files
+.DS_Store
+Thumbs.db
+
+# Ignore Python cache (if used)
+__pycache__/
+*.pyc
+
+# Ignore installers and large binaries
+installers/*
+!installers/sysmonconfig.xml   # Keep the config file
+
+# Ignore Ansible secrets or temporary files
+*.retry
+*.bak
+
+# Ignore IDE/editor configs
+.vscode/
+.idea/
+
+# Ignore logs and temporary files
+*.log
+tmp/
+*.swp
+
+# Ignore VirtualBox or other VM-related artifacts
+*.vdi
+*.vmdk
+*.iso
+*.ovf
+*.img
+*.tar.gz
+
+# Ignore generated keys
+**/private_key
+
+# Ignore inventory credentials 
+#ansible/inventory.ini
+
+# Ignore my notes
+*.txt

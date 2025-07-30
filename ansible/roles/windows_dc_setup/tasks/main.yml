@@ -1,0 +1,52 @@
+---
+- name: Ping Windows Host to verify WinRM connection
+  ansible.builtin.win_ping:
+
+- name: Ensure WinRM port is open in the firewall (for post-reboot)
+  ansible.windows.win_shell: New-NetFirewallRule -DisplayName "WinRM (HTTP-In)" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985
+  args:
+    creates: C:\Windows\System32\config\systemprofile\AppData\Local\Temp\winrm_rule.txt
+
+- name: Install Active Directory Domain Services feature
+  ansible.windows.win_feature:
+    name: AD-Domain-Services
+    state: present
+    include_management_tools: true
+
+- name: Promote server to the first Domain Controller in a new Forest
+  ansible.windows.win_shell: |
+    Import-Module ADDSDeployment
+    Install-ADDSForest `
+      -DomainName "{{ ad_domain_name }}" `
+      -DomainNetbiosName "{{ ad_domain_name.split('.')[0] | upper }}" `
+      -DomainMode Win2012R2 `
+      -ForestMode Win2012R2 `
+      -InstallDns `
+      -SafeModeAdministratorPassword (ConvertTo-SecureString "{{ ad_dsrm_password }}" -AsPlainText -Force) `
+      -Force
+  args:
+    creates: C:\Windows\NTDS\NTDS.dit
+  register: domain_promotion_result
+
+- name: Reboot the server to complete DC promotion
+  ansible.windows.win_reboot:
+    msg: "Rebooting to finalize DC promotion"
+    reboot_timeout: 1200
+  when: domain_promotion_result.changed
+
+- name: Wait until Active Directory services are fully running
+  ansible.windows.win_powershell:
+    script: |
+      try {
+        Get-ADDomain -Server localhost -ErrorAction Stop
+        # If the above command succeeds, exit with success (rc 0)
+        exit 0
+      }
+      catch {
+        # If it fails, exit with an error code (rc 1)
+        exit 1
+      }
+  register: ad_service_check
+  until: ad_service_check.failed == false 
+  retries: 20  # 20 retries * 30 seconds = 10 minutes
+  delay: 30    # Wait 30 seconds between retries

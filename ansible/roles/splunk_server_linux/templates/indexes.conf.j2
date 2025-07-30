@@ -1,0 +1,26 @@
+# Splunk Enterprise indexes.conf
+# This file defines the indexes to be used later
+
+[win]
+coldPath = $SPLUNK_DB/win/colddb
+homePath = $SPLUNK_DB/win/db
+maxTotalDataSizeMB = 10240
+thawedPath = $SPLUNK_DB/win/thaweddb
+
+[sysmon]
+coldPath = $SPLUNK_DB/sysmon/colddb
+homePath = $SPLUNK_DB/sysmon/db
+maxTotalDataSizeMB = 10240
+thawedPath = $SPLUNK_DB/sysmon/thaweddb
+
+[aws]
+coldPath = $SPLUNK_DB/aws/colddb
+homePath = $SPLUNK_DB/aws/db
+maxTotalDataSizeMB = 10240
+thawedPath = $SPLUNK_DB/aws/thaweddb
+
+[powershell]
+coldPath = $SPLUNK_DB/powershell/colddb
+homePath = $SPLUNK_DB/powershell/db
+maxTotalDataSizeMB = 10240
+thawedPath = $SPLUNK_DB/powershell/thaweddb

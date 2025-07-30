@@ -1,0 +1,65 @@
+---
+- name: 3. Configure Splunk Forwarding and Indexes
+  hosts: splunk_servers
+  become: true # Needed for some Splunk commands to interact with system components, and for privilege escalation to splunk_user
+
+  tasks:
+
+    # Manually restart splunk - workaround for some reason cant work without this
+    - name: Restart Splunk 
+      shell: /opt/splunk/bin/splunk restart
+
+    # Mandatory stop/enable boot/start sequence
+    - name: Stop Splunk before enabling boot start
+      shell: /opt/splunk/bin/splunk stop
+
+    - name: Enable Splunk to start on boot
+      ansible.builtin.command: "{{ splunk_home }}/bin/splunk enable boot-start -user {{ splunk_user }} -systemd-managed 1"
+      args:
+        creates: "/etc/systemd/system/Splunkd.service" # Correct path for Systemd
+      # Runs as root via become: true (no become_user here)
+
+    - name: Ensure Splunk installation directory has correct ownership and permissions
+      ansible.builtin.file:
+        path: "{{ splunk_home }}"
+        owner: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        mode: '0755' # rwxr-xr-x - common for directories and binaries
+        state: directory
+        recurse: yes # Apply this recursively to all contents
+      become: true # This task needs root privileges to change ownership on /opt/splunk
+      #notify: Start Splunk
+
+    - name: Start splunk
+      shell: /opt/splunk/bin/splunk start
+
+    - name: Wait for Splunk management port (8089) after re-start (MANDATORY for subsequent tasks)
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 8089
+        state: started
+        delay: 10
+        timeout: 300
+        connect_timeout: 5
+      delegate_to: localhost
+      become: false
+      # This task MUST run to ensure Splunk is up for subsequent steps.
+
+    - name: Ensure Splunk listens on forwarder receiving port (9997)
+      ansible.builtin.command: "{{ splunk_home }}/bin/splunk enable listen {{ splunk_receiving_port }} -auth admin:{{ splunk_admin_password }}"
+      args:
+        creates: "{{ splunk_home }}/etc/system/local/inputs.conf" # Correct file
+      #become_user: "{{ splunk_user }}"
+      #notify: Restart Splunk
+
+    - name: Deploy indexes.conf for indexes to be used later
+      ansible.builtin.template:
+        src: "../roles/splunk_server_linux/templates/indexes.conf.j2" 
+        dest: "{{ splunk_home }}/etc/system/local/indexes.conf"
+        owner: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        mode: '0644'
+      #notify: Restart Splunk
+
+    - name: Restart splunk
+      shell: /opt/splunk/bin/splunk restart

@@ -1,0 +1,16 @@
+---
+- name: 1. Master Playbook for Windows Server Configuration
+  hosts: windows_servers
+  gather_facts: false
+
+  roles:
+    - windows_dc_setup
+
+- import_playbook: dc_tasks_add_test_users.yml
+- import_playbook: dc_tasks_install_sysmon.yml
+- import_playbook: dc_tasks_enable_ps_logging.yml
+- import_playbook: dc_tasks_enable_ad_auditing.yml
+- import_playbook: dc_tasks_disable_defender.yml
+- import_playbook: dc_tasks_install_atomic_red_team.yml
+- import_playbook: dc_tasks_install_splunk_forwarder.yml 
+    

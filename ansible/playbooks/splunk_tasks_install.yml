@@ -1,0 +1,70 @@
+---
+- name: 2. Install Splunk Enterprise
+  hosts: splunk_servers
+  become: true 
+
+  tasks:
+    - name: Check if Splunk TGZ installer exists locally in synced folder
+      stat:
+        path: "/vagrant_installers/{{ splunk_tgz_filename }}"
+      register: splunk_tgz_stat
+
+    - name: Download Splunk Enterprise TGZ
+      ansible.builtin.get_url:
+        url: "{{ splunk_tgz_url }}"
+        dest: "/vagrant_installers/{{ splunk_tgz_filename }}"
+        mode: '0644'
+      when: not splunk_tgz_stat.stat.exists # Only download if not already present
+
+    - name: Create Splunk group
+      ansible.builtin.group:
+        name: "{{ splunk_group }}"
+        system: yes # Ensures it's a system group (typically for daemon users)
+        state: present # Ensures the group exists
+
+    - name: Create Splunk user and group
+      ansible.builtin.user:
+        name: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        system: yes
+        home: "{{ splunk_home }}" # Set home directory to where Splunk will be installed
+
+    - name: Extract Splunk Enterprise TGZ
+      ansible.builtin.unarchive:
+        src: "/vagrant_installers/{{ splunk_tgz_filename }}"
+        dest: "/opt/" # Extract to /opt, which creates /opt/splunk
+        remote_src: yes # Source is on the remote machine
+        owner: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        creates: "{{ splunk_home }}/bin/splunk" # Idempotent check: only extract if splunk binary doesn't exist
+  
+    - name: Ensure Splunk installation directory has correct ownership and permissions
+      ansible.builtin.file:
+        path: "{{ splunk_home }}"
+        owner: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        mode: '0755' # rwxr-xr-x - common for directories and binaries
+        state: directory
+        recurse: yes # Apply this recursively to all contents
+      become: true # This task needs root privileges to change ownership on /opt/splunk
+
+ 
+
+    - name: Accept license and start splunk 
+      shell: /opt/splunk/bin/splunk start --accept-license --answer-yes --no-prompt --seed-passwd {{ splunk_admin_password }}
+
+    # Manually start splunk - workaround for some reason cant work without this
+    - name: Start Splunk 
+      shell: /opt/splunk/bin/splunk start
+
+    - name: Wait for Splunk management port (8089) after initial start
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 8089
+        state: started
+        delay: 10
+        timeout: 300
+        connect_timeout: 5
+      delegate_to: localhost
+      become: false
+      #when: splunk_initial_start is changed # Only wait if the previous start task was executed

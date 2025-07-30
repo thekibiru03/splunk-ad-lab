@@ -1,0 +1,86 @@
+---
+- name: 5. Configure Advanced Audit Policies on Domain Controller
+  hosts: windows_servers
+  gather_facts: false
+
+  tasks:
+    - name: Force Advanced Audit Policy configuration to override legacy policy
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: SCENoApplyLegacyAuditPolicy
+        data: 1
+        type: dword
+        state: present
+
+    - name: Kerberos Authentication Service
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Kerberos Authentication Service'
+        audit_type: success,failure
+
+    - name: Kerberos Service Ticket Operations
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Kerberos Service Ticket Operations'
+        audit_type: success,failure
+
+    - name: Credential Validation
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Credential Validation'
+        audit_type: success,failure
+
+    - name: User Account Management
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'User Account Management'
+        audit_type: success,failure
+
+    - name: Security Group Management
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Security Group Management'
+        audit_type: success,failure
+
+    - name: Computer Account Management
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Computer Account Management'
+        audit_type: success,failure
+
+    - name: Logon
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Logon'
+        audit_type: success,failure
+        
+    - name: Logoff
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Logoff'
+        audit_type: success,failure
+
+    - name: Account Lockout
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Account Lockout'
+        audit_type: success,failure
+
+    - name: Special Logon
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Special Logon'
+        audit_type: success,failure
+
+    - name: Process Creation
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Process Creation'
+        audit_type: success
+
+    - name: Directory Service Changes
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Directory Service Changes'
+        audit_type: success,failure
+
+    - name: Sensitive Privilege Use
+      ansible.windows.win_audit_policy_system:
+        subcategory: 'Sensitive Privilege Use'
+        audit_type: success,failure
+        
+    - name: Include command line in process creation events
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit
+        name: ProcessCreationIncludeCmdLine_Enabled
+        data: 1
+        type: dword
+        state: present

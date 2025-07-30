@@ -1,0 +1,10 @@
+---
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
+  # No 'listen' is strictly needed if only using 'notify'
+
+- name: Restart Splunk
+  ansible.builtin.command: "{{ splunk_home }}/bin/splunk restart"
+
+- name: Start Splunk
+  ansible.builtin.command: "{{ splunk_home }}/bin/splunk start"

@@ -1,0 +1,52 @@
+---
+- name: 4. Install Splunk Apps (TA for Windows, SOAR App, etc.)
+  hosts: splunk_servers
+  become: true
+
+  tasks:
+    - name: Wait for Splunk management port (8089) before installing apps
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 8089
+        state: started
+        delay: 5
+        timeout: 120 # Shorter timeout if Splunk should already be up
+        connect_timeout: 5
+      delegate_to: localhost
+      become: false
+
+    - name: Copy Splunk Add-on for Windows (TA) from installers to Splunk apps directory
+      ansible.builtin.copy:
+        src: "/vagrant_installers/{{ ta_windows_zip_filename }}" # Source is the synced folder on VM
+        dest: "{{ splunk_home }}/etc/apps/{{ ta_windows_zip_filename }}"
+        owner: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        mode: '0644'
+        remote_src: yes 
+
+    - name: Install Splunk Add-on for Windows
+      ansible.builtin.command: "{{ splunk_home }}/bin/splunk install app {{ splunk_home }}/etc/apps/{{ ta_windows_zip_filename }} -auth admin:{{ splunk_admin_password }}"
+      args:
+        creates: "{{ splunk_home }}/etc/apps/{{ ta_windows_app_name }}" # Check if app directory exists
+      become_user: "{{ splunk_user }}"
+      #notify: Restart Splunk
+
+    # SOAR App Installation 
+    - name: Copy Splunk App for SOAR from installers to Splunk apps directory
+      ansible.builtin.copy:
+        src: "/vagrant_installers/{{ soar_app_filename }}" # Source is the synced folder on VM
+        dest: "{{ splunk_home }}/etc/apps/{{ soar_app_filename }}"
+        owner: "{{ splunk_user }}"
+        group: "{{ splunk_group }}"
+        mode: '0644'
+        remote_src: yes 
+
+    - name: Install Splunk App for SOAR
+      ansible.builtin.command: "{{ splunk_home }}/bin/splunk install app {{ splunk_home }}/etc/apps/{{ soar_app_filename }} -auth admin:{{ splunk_admin_password }}"
+      args:
+        creates: "{{ splunk_home }}/etc/apps/{{ soar_app_name }}" # IMPORTANT: Adjust 'some_soar_app_directory' based on actual app name
+      become_user: "{{ splunk_user }}"
+      #notify: Restart Splunk
+
+    - name: Restart splunk
+      shell: /opt/splunk/bin/splunk restart

@@ -1,0 +1,5 @@
+---
+- import_playbook: splunk_tasks_os_prep.yml
+- import_playbook: splunk_tasks_install.yml
+- import_playbook: splunk_tasks_configure.yml
+- import_playbook: splunk_tasks_apps.yml

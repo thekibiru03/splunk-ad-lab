@@ -1,0 +1,38 @@
+---
+- name: 6. Disable Windows Defender
+  hosts: windows_servers
+  gather_facts: false
+
+  tasks:
+    - name: Check if Windows Defender service is running
+      ansible.windows.win_service_info:
+        name: WinDefend
+      register: defender_service_status
+
+    - name: Disable Defender real-time monitoring via registry
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender
+        name: DisableAntiSpyware
+        data: 1
+        type: dword
+        state: present
+      when: defender_service_status.services[0].state == 'running'
+
+    - name: Disable Defender real-time protection features
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection
+        name: "{{ item.name }}"
+        data: 1
+        type: dword
+        state: present
+      with_items:
+        - { name: 'DisableBehaviorMonitoring' }
+        - { name: 'DisableOnAccessProtection' }
+        - { name: 'DisableScanOnRealtimeEnable' }
+      when: defender_service_status.services[0].state == 'running'
+
+    - name: Reboot the server to apply Defender changes
+      ansible.windows.win_reboot:
+        msg: "Rebooting to disable Windows Defender"
+        reboot_timeout: 1200
+      when: defender_service_status.services[0].state == 'running'

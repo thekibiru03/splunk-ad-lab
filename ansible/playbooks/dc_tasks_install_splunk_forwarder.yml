@@ -1,0 +1,108 @@
+---
+- name: 8. Install and Configure Splunk Universal Forwarder
+  hosts: windows_servers
+  gather_facts: false
+
+  vars:
+    splunk_forwarder_url: "https://download.splunk.com/products/universalforwarder/releases/9.4.3/windows/splunkforwarder-9.4.3-237ebbd22314-windows-x64.msi"
+    splunk_installer_path: "C:\\vagrant_installers\\splunkforwarder-9.4.3-237ebbd22314-windows-x64.msi"
+    splunk_app_dir: 'C:\\Program Files\\SplunkUniversalForwarder\\etc\\apps'
+    sysmon_ta_local_dir: '{{ splunk_app_dir }}\\Splunk_TA_microsoft_sysmon\\local'
+    windows_ta_local_dir: '{{ splunk_app_dir }}\\Splunk_TA_windows\\local'
+
+  tasks:
+    - name: Ensure installer directory exists on the remote host
+      ansible.windows.win_file:
+        path: "C:\\vagrant_installers"
+        state: directory
+
+    - name: Check if Splunk Forwarder installer exists
+      ansible.windows.win_stat:
+        path: "{{ splunk_installer_path }}"
+      register: forwarder_installer_stat
+
+    - name: Download Splunk Forwarder installer if it does not exist
+      ansible.windows.win_get_url:
+        url: "{{ splunk_forwarder_url }}"
+        dest: "{{ splunk_installer_path }}"
+      when: not forwarder_installer_stat.stat.exists
+
+    - name: Install Splunk Universal Forwarder using msiexec
+      ansible.windows.win_shell: |
+        msiexec.exe /i "{{ splunk_installer_path }}" /quiet AGREETOLICENSE=yes RECEIVING_INDEXER="{{ splunk_server_ip }}:9997"
+      args:
+        creates: 'C:\Program Files\SplunkUniversalForwarder\bin\splunkd.exe'
+      register: install_result
+
+    # ---------------------- TA: Windows (ZIP) ----------------------
+    - name: Install Splunk Add-on for Windows (TA)
+      community.windows.win_unzip:
+        src: "C:\\vagrant_installers\\Splunk_TA_windows.zip"
+        dest: "{{ splunk_app_dir }}"
+        remote_src: yes
+      notify: Restart SplunkForwarder
+
+    # ---------------------- TA: Sysmon (TGZ → Extract + Copy) ----------------------
+    - name: Ensure temporary directory exists for Sysmon TA (only if missing)
+      ansible.builtin.file:
+        path: /tmp/Splunk_TA_sysmon
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+      
+    - name: Extract Splunk TA for Sysmon on control node
+      ansible.builtin.unarchive:
+        src: ../../installers/splunk-add-on-for-sysmon_403.tgz
+        dest: /tmp/Splunk_TA_sysmon
+        remote_src: no
+      delegate_to: localhost
+      run_once: true
+
+    - name: Copy extracted Sysmon TA to Windows UF
+      ansible.windows.win_copy:
+        src: /tmp/Splunk_TA_sysmon/
+        dest: '{{ splunk_app_dir }}\\Splunk_TA_microsoft_sysmon'
+        force: yes
+
+    - name: Cleanup temporary TA extraction on control node
+      ansible.builtin.file:
+        path: /tmp/Splunk_TA_sysmon
+        state: absent
+      delegate_to: localhost
+      run_once: true
+
+    # ---------------------- TA Configs ----------------------
+    - name: Create local directory for Sysmon TA config
+      ansible.windows.win_file:
+        path: "{{ sysmon_ta_local_dir }}"
+        state: directory
+
+    - name: Copy Sysmon TA inputs.conf
+      ansible.windows.win_copy:
+        src: ../roles/windows_dc_setup/files/sysmon_input.conf
+        dest: "{{ sysmon_ta_local_dir }}\\inputs.conf"
+      notify: Restart SplunkForwarder
+
+    - name: Create local directory for Windows TA config
+      ansible.windows.win_file:
+        path: "{{ windows_ta_local_dir }}"
+        state: directory
+
+    - name: Copy Windows TA inputs.conf
+      ansible.windows.win_copy:
+        src: ../roles/windows_dc_setup/files/win_inputs.conf
+        dest: "{{ windows_ta_local_dir }}\\inputs.conf"
+      notify: Restart SplunkForwarder
+
+    - name: Ensure Splunk Forwarder service is running
+      ansible.windows.win_service:
+        name: SplunkForwarder
+        start_mode: auto
+        state: started
+
+  handlers:
+    - name: Restart SplunkForwarder
+      ansible.windows.win_service:
+        name: SplunkForwarder
+        state: restarted
