@@ -1,0 +1,31 @@
+---
+# This file contains tasks for preparing the OS for Splunk SOAR installation.
+# NOTE: The 'Bootstrap Ansible' raw task is no longer needed for Oracle Linux 9.
+
+- name: Set system locale to en_US.UTF-8 for SOAR compatibility
+  ansible.builtin.command: localectl set-locale LANG=en_US.UTF-8
+  changed_when: true
+
+- name: Set system keymap to US for SOAR compatibility
+  ansible.builtin.command: localectl set-keymap us
+  changed_when: true
+
+- name: Update all system packages
+  ansible.builtin.dnf:
+    name: '*'
+    state: latest
+
+- name: Install SOAR prerequisites
+  ansible.builtin.dnf:
+    name:
+      - unzip
+      - rsync
+      - wget
+    state: present
+
+- name: Configure firewall to allow HTTPS access
+  ansible.posix.firewalld:
+    port: 8443/tcp
+    permanent: yes
+    state: enabled
+  notify: Reload firewalld

@@ -1,0 +1,51 @@
+
+- name: Creates directory
+  file:
+    path: /opt/soar
+    state: directory
+
+- name: Check if SOAR installer exists locally
+  ansible.builtin.stat:
+    path: "{{ soar_local_installer_path }}"
+  register: soar_installer_stat
+  delegate_to: localhost
+  become: false
+
+- name: Download SOAR installer if it does not exist
+  ansible.builtin.get_url:
+    url: "{{ soar_installer_url }}"
+    dest: "{{ soar_local_installer_path }}"
+  when: not soar_installer_stat.stat.exists
+  delegate_to: localhost
+  become: false
+
+- name: Copy Splunk SOAR to server
+  unarchive:
+    src: "{{ soar_local_installer_path }}"
+    dest: /home/vagrant
+    creates: /home/vagrant/splunk-soar/soar-prepare-system
+  become: yes
+  become_user: vagrant
+
+- name: prepare phantom install script without apps
+  shell: /home/vagrant/splunk-soar/soar-prepare-system --splunk-soar-home /opt/soar --no-prompt
+  become: yes
+  environment:
+    http_proxy: ""
+    https_proxy: ""
+
+- name: copy splunk soar folder
+  shell: cp -r /home/vagrant/splunk-soar /home/phantom/splunk-soar
+  args: 
+    creates: /home/phantom/splunk-soar/soar-install
+
+- name: chown splunk soar folder
+  shell: chown -R phantom. /home/phantom/splunk-soar
+
+- name: run the phantom install script
+  become: yes
+  become_user: phantom
+  shell: ./soar-install --splunk-soar-home /opt/soar --no-prompt --ignore-warnings --with-apps
+  args:
+    chdir: /home/phantom/splunk-soar
+    creates: /opt/soar/bin/phsvc

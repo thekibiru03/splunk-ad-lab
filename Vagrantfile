@@ -9,12 +9,12 @@ Vagrant.configure("2") do |config|
 
   # --- Oracle Linux Splunk Server VM ---
   config.vm.define "splunk_server_ol" do |splunk_server|
-    splunk_server.vm.box = "generic/oracle8"
+    splunk_server.vm.box = "generic/oracle9"
     splunk_server.vm.hostname = "splunk-server"
     splunk_server.vm.provider "virtualbox" do |vb|
       vb.memory = "2560"
       vb.cpus = "2"
-      vb.name = "Splunk-Enterprise-OracleLinux8"
+      vb.name = "Splunk-Enterprise-OracleLinux9"
     end
     splunk_server.vm.network "private_network", ip: splunk_server_ip
     splunk_server.vm.network "forwarded_port", guest: 8000, host: 8000
@@ -79,6 +79,29 @@ Vagrant.configure("2") do |config|
         sysmon_install_dir: "C:\\Sysmon",
         ta_windows_zip_filename: "Splunk_TA_windows.zip", 
         ta_sysmon_zip_filename: "splunk-add-on-for-sysmon_403.tgz"
+      }
+    end
+  end
+  # --- Splunk SOAR Server VM ---
+  config.vm.define "soar_server" do |soar_server|
+    soar_server.vm.box = "generic/oracle9"
+    soar_server.vm.hostname = "soar-server"
+    soar_server.vm.provider "virtualbox" do |vb|
+      vb.memory = "3096" # SOAR requires significant memory
+      vb.cpus = "2"
+      vb.name = "Splunk-SOAR-OracleLinux9"
+    end
+    soar_server.vm.network "private_network", ip: "192.168.56.30"
+    soar_server.vm.network "forwarded_port", guest: 8443, host: 8443 # Forward HTTPS
+    soar_server.vm.synced_folder "installers/", "/vagrant_installers"
+
+    soar_server.vm.provision "ansible" do |ansible|
+      ansible.playbook = "ansible/playbooks/setup_soar_server.yml"
+      ansible.inventory_path = "ansible/inventory.ini"
+      ansible.config_file = "ansible/ansible.cfg"
+      ansible.limit = "soar-server"
+      ansible.extra_vars = {
+        soar_installer_filename: "splunk_soar-unpriv-6.4.1.361-bea76553-el9-x86_64.tgz "
       }
     end
   end
