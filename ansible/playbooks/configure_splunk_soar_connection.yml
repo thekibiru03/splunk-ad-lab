@@ -1,0 +1,65 @@
+---
+- name: Fully Automate Splunk to SOAR Connection with Health Checks
+  hosts: splunk_servers
+  become: true
+  gather_facts: false
+
+  vars:
+    splunk_api_port: 8089
+    splunk_admin_user: "admin"
+    splunk_admin_password: "changeme"
+    splunk_app_context: "phantom"
+    soar_api_port: 8443
+    soar_server_ip: "192.168.56.30"
+    soar_admin_user: "soar_local_admin"
+    soar_admin_password: "password"
+
+  tasks:
+    - name: Wait for Splunk to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ splunk_api_port }}"
+        state: started
+        delay: 10
+        timeout: 300
+      delegate_to: localhost
+
+    - name: Wait for SOAR to be ready
+      ansible.builtin.wait_for:
+        host: "{{ soar_server_ip }}"
+        port: "{{ soar_api_port }}"
+        state: started
+        delay: 10
+        timeout: 300
+      delegate_to: localhost
+
+    - name: Fetch SOAR auth token
+      ansible.builtin.uri:
+        url: "https://{{ soar_server_ip }}:{{ soar_api_port }}/rest/ph_user?_filter_username__iexact='{{ soar_admin_user }}'"
+        method: GET
+        user: "{{ soar_admin_user }}"
+        password: "{{ soar_admin_password }}"
+        force_basic_auth: yes
+        validate_certs: no
+      register: soar_user_info
+      until: soar_user_info.status == 200
+      retries: 10
+      delay: 30
+
+    - name: Configure Splunk App for SOAR Export
+      ansible.builtin.uri:
+        url: "https://{{ ansible_host }}:{{ splunk_api_port }}/servicesNS/nobody/{{ splunk_app_context }}/configs/conf-phantom/server"
+        method: POST
+        user: "{{ splunk_admin_user }}"
+        password: "{{ splunk_admin_password }}"
+        validate_certs: no
+        body_format: form-urlencoded
+        body:
+          - "ph_auth_token={{ soar_user_info.json.data[0]['ph-auth-token'] | urlencode }}"
+          - "server=https://{{ soar_server_ip }}"
+        status_code: 200
+      register: config_result
+
+    - name: Restart Splunk to apply configuration
+      ansible.builtin.command: "{{ splunk_home }}/bin/splunk restart"
+      when: config_result.changed

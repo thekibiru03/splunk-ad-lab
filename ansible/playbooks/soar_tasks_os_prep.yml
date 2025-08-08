@@ -10,6 +10,7 @@
   ansible.builtin.command: localectl set-keymap us
   changed_when: true
 
+
 - name: Update all system packages
   ansible.builtin.dnf:
     name: '*'
@@ -18,14 +19,35 @@
 - name: Install SOAR prerequisites
   ansible.builtin.dnf:
     name:
-      - unzip
-      - rsync
       - wget
+      - curl
+      - tar
+      - gzip
+      - python3
+      - python3-pip
+      - firewalld
     state: present
-
+- name: Start and enable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+    
 - name: Configure firewall to allow HTTPS access
   ansible.posix.firewalld:
     port: 8443/tcp
     permanent: yes
     state: enabled
-  notify: Reload firewalld
+
+
+- name: Set SELinux to permissive mode
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+  become: true
+
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
+  # No 'listen' is strictly needed if only using 'notify'
+
+

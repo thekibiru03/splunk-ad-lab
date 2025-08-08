@@ -1,0 +1,30 @@
+---
+# Tasks to install selected Splunk SOAR apps from the local archive
+
+- name: Create a temporary directory for app extraction
+  ansible.builtin.file:
+    path: "{{ soar_remote_temp_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Unarchive the soar_component_apps.tar file
+  ansible.builtin.unarchive:
+    src: "/tmp/splunk-soar/soar_component_apps.tar"
+    dest: "{{ soar_remote_temp_dir }}"
+    remote_src: yes
+
+- name: Install the selected Splunk SOAR apps
+  ansible.builtin.command:
+    # Use the corrected command and path structure for app installation
+    cmd: "{{ soar_home }}/bin/phenv install_apps -v0 {{ soar_remote_temp_dir }}/dependencies/apps/{{ item }}"
+  loop: "{{ soar_apps_to_install }}"
+  loop_control:
+    label: "{{ item }}"
+  become_user: "{{ soar_user }}"
+  register: app_install_result
+  changed_when: "'INSTALLING' in app_install_result.stdout"
+
+- name: Clean up the temporary app directory
+  ansible.builtin.file:
+    path: "{{ soar_remote_temp_dir }}"
+    state: absent

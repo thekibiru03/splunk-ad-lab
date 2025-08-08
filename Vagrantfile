@@ -87,22 +87,33 @@ Vagrant.configure("2") do |config|
     soar_server.vm.box = "generic/oracle9"
     soar_server.vm.hostname = "soar-server"
     soar_server.vm.provider "virtualbox" do |vb|
-      vb.memory = "3096" # SOAR requires significant memory
+      vb.memory = "2560"
       vb.cpus = "2"
       vb.name = "Splunk-SOAR-OracleLinux9"
     end
     soar_server.vm.network "private_network", ip: "192.168.56.30"
-    soar_server.vm.network "forwarded_port", guest: 8443, host: 8443 # Forward HTTPS
+    soar_server.vm.network "forwarded_port", guest: 8443, host: 8443
     soar_server.vm.synced_folder "installers/", "/vagrant_installers"
 
+    # --- Provisioner 1: Configure the SOAR server itself ---
     soar_server.vm.provision "ansible" do |ansible|
       ansible.playbook = "ansible/playbooks/setup_soar_server.yml"
       ansible.inventory_path = "ansible/inventory.ini"
       ansible.config_file = "ansible/ansible.cfg"
       ansible.limit = "soar-server"
       ansible.extra_vars = {
-        soar_installer_filename: "splunk_soar-unpriv-6.4.1.361-bea76553-el9-x86_64.tgz "
+        soar_installer_filename: "splunk_soar-unpriv-6.4.1.361-bea76553-el9-x86_64.tgz"
       }
+    end
+
+    # --- Provisioner 2: Configure the Splunk-to-SOAR Connection ---
+    # This runs AFTER the SOAR server is up and targets the Splunk server.
+    soar_server.vm.provision "ansible" do |ansible|
+      ansible.playbook = "ansible/playbooks/configure_splunk_soar_connection.yml"
+      ansible.inventory_path = "ansible/inventory.ini"
+      ansible.config_file = "ansible/ansible.cfg"
+      # IMPORTANT: Limit this playbook run to the splunk_server
+      ansible.limit = "splunk-server"
     end
   end
 end

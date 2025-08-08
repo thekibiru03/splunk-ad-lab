@@ -8,6 +8,24 @@
     soar_installer_url: "https://download.splunk.com/products/splunk_soar-unpriv/releases/6.4.1/linux/splunk_soar-unpriv-6.4.1.361-bea76553-el9-x86_64.tgz"
     soar_local_installer_path: "../../installers/{{ soar_installer_filename }}"
     soar_remote_temp_dir: "/tmp/splunk_soar_installer"
+    soar_home: "/opt/soar"
+    soar_user: "phantom"
+    soar_apps_to_install:
+      - "Windows_Remote_Management.tgz"
+      - "MaxMind.tgz"
+      - "WHOIS.tgz"
+      - "AD_LDAP.tgz"
+      - "VirusTotal_v3.tgz"
+      - "Screenshot_Machine.tgz"
+      - "Phishing_Initiative.tgz"
+      - "Phantom.tgz"
+      - "Splunk.tgz"
+      - "PhishTank.tgz"
+      - "Slack.tgz"
+      - "urlscan.io.tgz"
+      - "WMI.tgz"
+      - "TheHive.tgz"
+      - "Have_I_Been_Pwned.tgz"
 
   tasks:
     - name: Include OS Preparation tasks
@@ -15,9 +33,11 @@
 
     - name: Include SOAR Installation and Configuration tasks
       ansible.builtin.import_tasks: soar_tasks_install_and_config.yml
+    
 
-  handlers:
-    - name: Reload firewalld
-      ansible.builtin.service:
-        name: firewalld
-        state: reloaded
+    - name: Run SOAR app installation tasks
+      ansible.builtin.import_tasks: soar_tasks_install_apps.yml
+
+
+
+

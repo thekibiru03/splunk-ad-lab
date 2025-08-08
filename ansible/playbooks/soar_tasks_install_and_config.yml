@@ -1,8 +1,17 @@
+---
+- name: Create SOAR user and group
+  ansible.builtin.user:
+    name: "{{ soar_user }}"
+    system: yes
+    state: present
 
-- name: Creates directory
-  file:
-    path: /opt/soar
+- name: Create SOAR installation directory
+  ansible.builtin.file:
+    path: "{{ soar_home }}"
     state: directory
+    owner: "{{ soar_user }}"
+    group: "{{ soar_user }}"
+    mode: '0755'
 
 - name: Check if SOAR installer exists locally
   ansible.builtin.stat:
@@ -19,33 +28,42 @@
   delegate_to: localhost
   become: false
 
-- name: Copy Splunk SOAR to server
-  unarchive:
+- name: Copy and Unarchive Splunk SOAR installer
+  ansible.builtin.unarchive:
     src: "{{ soar_local_installer_path }}"
-    dest: /home/vagrant
-    creates: /home/vagrant/splunk-soar/soar-prepare-system
-  become: yes
-  become_user: vagrant
+    dest: "/tmp"
+    remote_src: no
+  become: true
 
-- name: prepare phantom install script without apps
-  shell: /home/vagrant/splunk-soar/soar-prepare-system --splunk-soar-home /opt/soar --no-prompt
-  become: yes
+- name: Prepare SOAR installation
+  ansible.builtin.command:
+    cmd: /tmp/splunk-soar/soar-prepare-system --splunk-soar-home {{ soar_home }} --no-prompt
+  become: true
   environment:
     http_proxy: ""
     https_proxy: ""
 
-- name: copy splunk soar folder
-  shell: cp -r /home/vagrant/splunk-soar /home/phantom/splunk-soar
-  args: 
-    creates: /home/phantom/splunk-soar/soar-install
-
-- name: chown splunk soar folder
-  shell: chown -R phantom. /home/phantom/splunk-soar
-
-- name: run the phantom install script
-  become: yes
-  become_user: phantom
-  shell: ./soar-install --splunk-soar-home /opt/soar --no-prompt --ignore-warnings --with-apps
+- name: Run SOAR installation
+  ansible.builtin.command:
+    cmd: /tmp/splunk-soar/soar-install --splunk-soar-home {{ soar_home }} --no-prompt --ignore-warnings 
+  become_user: "{{ soar_user }}"
   args:
-    chdir: /home/phantom/splunk-soar
-    creates: /opt/soar/bin/phsvc
+    creates: "{{ soar_home }}/bin/phsvc"
+
+- name: Wait for SOAR to be ready
+  ansible.builtin.uri:
+    url: "https://localhost:8443"
+    method: GET
+    validate_certs: no
+  register: soar_health_check
+  until: soar_health_check.status == 200 or soar_health_check.status == 302
+  retries: 30
+  delay: 10
+  ignore_errors: yes
+
+- name: Display SOAR access information
+  ansible.builtin.debug:
+    msg: |
+      SOAR installation completed!
+      Access SOAR at: https://192.168.56.30:8443
+      Default credentials: soar_local_admin/password (change on first login)
